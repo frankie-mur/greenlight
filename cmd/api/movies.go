@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/frankie-mur/greenlight/internal/data"
+	"github.com/frankie-mur/greenlight/internal/validator"
 )
 
 func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request) {
@@ -19,6 +20,23 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 	err := app.readJSON(w, r, &input)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	movie := &data.Movie{
+		Title:   input.Title,
+		Year:    input.Year,
+		Runtime: input.Runtime,
+		Genres:  input.Genres,
+	}
+
+	// Initialize a new Validator.
+	v := validator.New()
+
+	// Call the ValidateMovie() function and return a response containing the errors if
+	// any of the checks fail.
+	if data.ValidateMovie(v, movie); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
