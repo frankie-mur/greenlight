@@ -46,7 +46,7 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 
 	var (
 		mu      sync.Mutex
-		clients map[string]*client
+		clients = make(map[string]*client)
 	)
 
 	//Go routine to remove stale client entries
