@@ -158,3 +158,24 @@ func (app *application) readInt(qs url.Values, key string, defaultValue int, v *
 
 	return i
 }
+
+// Wrapper for a goroutine that recovers from panics
+func (app *application) background(fn func()) {
+	// Start a waitgroup counter, this will allow our background goroutine to finish
+	// in the case of a shutdown
+	app.wg.Add(1)
+	//launch goroutine
+	go func() {
+		defer func() {
+			//Decrement the waitgroup following the goroutine return
+			// NOTE: this is equivalent to wg.Add(-1)
+			defer app.wg.Done()
+			//Recover any panic
+			if err := recover(); err != nil {
+				app.logger.Error(fmt.Sprintf("failed in background job: %v", err))
+			}
+		}()
+		//Call function passed in
+		fn()
+	}()
+}
