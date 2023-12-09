@@ -1,12 +1,15 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/frankie-mur/greenlight/internal/data"
 	"golang.org/x/time/rate"
 )
 
@@ -108,5 +111,50 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		}
 
+	})
+}
+
+// Middleware is used to authenticate an auth token in headers
+func (app *application) authenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		//Set Vary header for any cache
+		r.Header.Set("Vary", "Authorization")
+
+		//Retrieve auth header from request
+		authHeader := r.Header.Get("Authorization")
+
+		//Check if exists
+		if len(authHeader) == 0 {
+			//If not set to anonymous user
+			r = app.contextSetUser(r, data.AnonymousUser)
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		//Validate the authorization header
+		headerParts := strings.Split(authHeader, " ")
+		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+
+		//extract the token
+		token := headerParts[1]
+
+		//retrieve the user matching the given token
+		user, err := app.models.Users.GetForToken(data.ScopeAuthentication, token)
+		if err != nil {
+			switch {
+			case errors.Is(err, data.ErrRecordNotFound):
+				app.invalidAuthenticationTokenResponse(w, r)
+			default:
+				app.serverErrorResponse(w, r, err)
+			}
+			return
+		}
+		//Add user to the request context
+		r = app.contextSetUser(r, user)
+
+		next.ServeHTTP(w, r)
 	})
 }

@@ -15,6 +15,9 @@ var (
 	ErrDuplicateEmail = errors.New("duplicate email")
 )
 
+// this user is represent as an unauthorized user (req sent from client without Authorization header)
+var AnonymousUser = &User{}
+
 type User struct {
 	ID        int64     `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
@@ -35,6 +38,10 @@ type password struct {
 
 type UserModel struct {
 	DB *sql.DB
+}
+
+func (u *User) isAnonymous() bool {
+	return u == AnonymousUser
 }
 
 // Insert a new record in the database for the user. Note that the id, created_at and
