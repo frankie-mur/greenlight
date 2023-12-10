@@ -56,6 +56,13 @@ func (app *application) createUserHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	//Give user basic read permissions
+	err = app.models.Permissions.AddForUser(user.ID, data.MoviesReadPermission)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
 	// Generate an activation token for the user
 	token, err := app.models.Tokens.New(user.ID, (24*time.Hour)*3, data.ScopeActivation)
 	if err != nil {

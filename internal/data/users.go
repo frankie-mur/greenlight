@@ -40,7 +40,7 @@ type UserModel struct {
 	DB *sql.DB
 }
 
-func (u *User) isAnonymous() bool {
+func (u *User) IsAnonymous() bool {
 	return u == AnonymousUser
 }
 
