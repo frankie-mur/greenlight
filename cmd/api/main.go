@@ -3,9 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
+	"expvar"
 	"flag"
 	"log/slog"
+	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -100,6 +103,23 @@ func main() {
 	// established.
 	logger.Info("database connection pool established")
 
+	// Setup for expvar metrics
+	expvar.NewString("version").Set(version)
+	// Publish the number of active goroutines.
+	expvar.Publish("goroutines", expvar.Func(func() any {
+		return runtime.NumGoroutine()
+	}))
+
+	// Publish the database connection pool statistics.
+	expvar.Publish("database", expvar.Func(func() any {
+		return db.Stats()
+	}))
+
+	// Publish the current Unix timestamp.
+	expvar.Publish("timestamp", expvar.Func(func() any {
+		return time.Now().Unix()
+	}))
+
 	// Declare our application struct
 	app := &application{
 		config: cfg,
@@ -141,4 +161,34 @@ func openDB(cfg config) (*sql.DB, error) {
 	}
 
 	return db, nil
+}
+
+func (app *application) metrics(next http.Handler) http.Handler {
+	// Initialize expvar variables when the middleware chain is first built.
+	var (
+		totalRequestsReceived           = expvar.NewInt("total_requests_received")
+		totalResponsesSent              = expvar.NewInt("total_responses_sent")
+		totalProcessingTimeMicroseconds = expvar.NewInt("total_processing_time_μs")
+	)
+
+	// The following code will be run for every request...
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Record the time that we started to process the request.
+		start := time.Now()
+
+		// Use the Add() method to increment the number of requests received by 1.
+		totalRequestsReceived.Add(1)
+
+		// Call the next handler in the chain.
+		next.ServeHTTP(w, r)
+
+		// On the way back up the middleware chain, increment the number of responses
+		// sent by 1.
+		totalResponsesSent.Add(1)
+
+		// Calculate the number of microseconds since we began to process the request,
+		// then increment the total processing time by this amount.
+		duration := time.Since(start).Microseconds()
+		totalProcessingTimeMicroseconds.Add(duration)
+	})
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"expvar"
 	"net/http"
 
 	"github.com/frankie-mur/greenlight/internal/data"
@@ -30,5 +31,8 @@ func (app *application) routes() http.Handler {
 	//token routes
 	router.HandlerFunc(http.MethodPost, "/v1/tokens/authentication", app.createAuthTokenHandler)
 
-	return app.recoverPanic(app.enableCORS(app.rateLimit(app.authenticate(router))))
+	//metric routes
+	router.Handler(http.MethodGet, "/debug/vars", expvar.Handler())
+
+	return app.metrics(app.recoverPanic(app.enableCORS(app.rateLimit(app.authenticate(router)))))
 }
