@@ -1,0 +1,8 @@
+{
+  email frankidatank@gmail.com
+}
+
+159.65.64.26 {
+  respond /debug/* "Not Permitted" 403
+  reverse_proxy localhost:4000
+}
